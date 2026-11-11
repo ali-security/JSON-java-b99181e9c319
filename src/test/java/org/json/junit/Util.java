@@ -117,4 +117,35 @@ public class Util {
             );
         }
     }
+
+    /**
+     * Runs the given code on a dedicated thread with a large (8 MB) stack and
+     * returns whatever it threw. Tests that drive a parser to its default
+     * maximum nesting depth need this, because the test JVM may be run with a
+     * small stack (for example -Xss512k) on which hundreds of nested parse
+     * frames would not fit before the nesting limit is reached.
+     * @param body the code to run
+     * @return the Throwable thrown by body, or null if it completed normally
+     */
+    public static Throwable throwableFromLargeStack(final Runnable body) {
+        final Throwable[] thrown = new Throwable[1];
+        Thread thread = new Thread(null, new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    body.run();
+                } catch (Throwable t) {
+                    thrown[0] = t;
+                }
+            }
+        }, "large-stack-test", 8L * 1024 * 1024);
+        thread.start();
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for the large stack test thread");
+        }
+        return thrown[0];
+    }
 }
